@@ -1,7 +1,8 @@
+#!/usr/bin/env node
+
 //imports
 import isValidPath from "is-valid-path";
 import fs from "fs";
-import { EOL as endOfLineChar } from "os";
 
 //*********************
 //LOWDB setup
@@ -40,31 +41,48 @@ db.write();
 
 const days = db.data.days;
 //************************************
-
-//CONFIG
-const config = {
-  timeout: 600, //connection retry interval in seconds
-  logFolderPath: "C:/logs",
-};
-
+var config: any;
 //arguments guard
-//if no five arguments: [2]:mode,[3]:logfile/dir path,[4]:machine_id exit
-if (
-  process.argv.length !== 5 ||
-  (process.argv[2] !== "sync" && process.argv[2] !== "watch")
-) {
-  console.log(
-    `Not valid arguments!\n
-    Please choose from the following:\n
-    Watch file: npm start watch <mounted_log_directory path> <machine_name>\n
-    Sync day:npm start sync <log_file_path> <machine_name>\n`
-  );
-  process.exit(1);
-}
-
-//filepath format guard
-if (!isValidPath(process.argv[3])) {
-  console.log(process.argv[3] + " is not a valid file system path.");
+if (process.argv[2] === "watch") {
+  if (
+    process.argv.length === 4 &&
+    fs.existsSync(process.argv[3]) &&
+    process.argv[3].split(".")[process.argv[3].split(".").length - 1] === "json"
+  ) {
+    //TODO check if all required attributes are present
+    config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+  } else {
+    console.log(
+      `To watch a file provide a valid JSON file with configuration data.\n
+      1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
+      `
+    );
+    process.exit(1);
+  }
+} else if (process.argv[2] === "sync") {
+  if (
+    process.argv.length === 5 &&
+    fs.existsSync(process.argv[3]) &&
+    process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
+      "json" &&
+    Date.parse(process.argv[4])
+  ) {
+    //TODO check if all required attributes are present
+    config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+  } else {
+    console.log(
+      `To sync a file provide a valid JSON file with configuration data and a valid date to sync.\n
+      2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
+      `
+    );
+    process.exit(1);
+  }
+} else {
+  console.log(`This program has 2 operation modes:\n
+  1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
+  2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
+  Please provide the valid arguments for one of them.\n
+  For more info see the readme file.\n`);
   process.exit(1);
 }
 
@@ -87,7 +105,7 @@ async function main() {
     }
 
     if (process.argv[2] === "sync") {
-      syncFile(process.argv[3]);
+      syncFile(getFilePath(getDayString(new Date(process.argv[4]))));
     }
   } catch (error: any) {
     createErrorLogRecord(error.message);
@@ -104,8 +122,10 @@ async function main() {
 async function establishConnection() {
   let folderExists = false;
   while (!folderExists) {
-    createLogRecord("Trying to reach destination folder: " + process.argv[3]);
-    if (fs.existsSync(process.argv[3])) {
+    createLogRecord(
+      "Trying to reach destination folder: " + config.targetFolderPath
+    );
+    if (fs.existsSync(config.targetFolderPath)) {
       //if folder found exit the loop
       folderExists = true;
       createLogRecord("Target folder found!");
@@ -178,7 +198,7 @@ function syncFile(filePath: string) {
 
   let records: FrameRecord[] = [];
   const fileContents = fs.readFileSync(filePath, "utf-8");
-  fileContents.split(endOfLineChar).forEach((line) => {
+  fileContents.split(config.endOfLineChar).forEach((line) => {
     let record = parseLine(line);
     if (!record) {
       return;
@@ -247,14 +267,14 @@ function watchLogFile(date: Date) {
 
     // We're only going to read the portion of the file that
     // we have not read so far. Obtain new file size.
-    var newFileSize = fs.statSync(logFilePath).size;
+    let newFileSize = fs.statSync(logFilePath).size;
     // Calculate size difference.
-    var sizeDiff = newFileSize - fileSize;
+    let sizeDiff = newFileSize - fileSize;
 
     // Create a buffer to hold only the data we intend to read.
-    var buffer: Buffer = Buffer.alloc(sizeDiff);
+    let buffer: Buffer = Buffer.alloc(sizeDiff);
     // Obtain reference to the file's descriptor.
-    var fileDescriptor = fs.openSync(logFilePath, "r");
+    let fileDescriptor = fs.openSync(logFilePath, "r");
     // Synchronously read from the file starting from where we read
     // to last time and store data in our buffer.
     fs.readSync(fileDescriptor, buffer, 0, sizeDiff, fileSize);
@@ -268,7 +288,6 @@ function watchLogFile(date: Date) {
   createLogRecord("Started watching file: " + logFilePath);
   //sync the file after the watch was set
   syncFile(logFilePath);
-  createLogRecord("Synced: " + logFilePath);
 }
 
 /**
@@ -280,7 +299,7 @@ function parseBuffer(buffer: Buffer) {
   let records: FrameRecord[] = [];
   buffer
     .toString()
-    .split(endOfLineChar)
+    .split(config.endOfLineChar)
     .forEach(function (line) {
       let record = parseLine(line);
       if (!record) {
@@ -323,7 +342,7 @@ function getDayString(date: Date): string {
  * @param dayString - The string format fitting the date format in the log file names.
  */
 function getFilePath(dayString: string) {
-  return process.argv[3] + "/Produced frames - " + dayString + ".csv";
+  return config.targetFolderPath + "/Produced frames - " + dayString + ".csv";
 }
 
 /**
@@ -408,7 +427,6 @@ function postData(producedFrames: FrameRecord[]) {
  * @param message - Message to be logged
  */
 function createLogRecord(message: string) {
-  debugger;
   let logLine = new Date().toLocaleString() + " : " + message + "\n";
   fs.appendFileSync(config.logFolderPath + "/log.txt", logLine);
 }

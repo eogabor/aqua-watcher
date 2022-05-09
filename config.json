@@ -1,0 +1,7 @@
+{
+    "targetFolderPath": "L:/Data/Log",
+    "timeout": 600,
+    "logFolderPath": "./",
+    "endOfLineChar": "\r\n",
+    "machineId": 1
+}
