@@ -1,30 +1,14 @@
 #!/usr/bin/env node
 
 //imports
-import isValidPath from "is-valid-path";
 import fs from "fs";
+
+import { AquaLoggerConfig, validateArguments } from "./validations.js";
+import { initWinston } from "./logger.js";
+import { db } from "./lowdb-config.js";
 import winston from "winston";
-import DailyRotateFile from "winston-daily-rotate-file";
 
-//type of the config file data
-type AquaLoggerConfig = {
-  targetFolderPath: string;
-  timeout: number;
-  logFolderPath: string;
-  endOfLineChar: string;
-  machineId: number;
-};
-
-//*********************
-//LOWDB setup
-import { join, dirname } from "path";
-import * as lowdb from "lowdb";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Use JSON file for storage
-//Setting up lowdb
-type FrameRecord = {
+export type FrameRecord = {
   time: string;
   timestamp: string;
   productId: number;
@@ -37,93 +21,16 @@ type FrameRecord = {
   printedName: string;
 };
 
-type Data = {
-  days: { date: string; frames: FrameRecord[] }[];
-};
-
-const file = join(__dirname, "db.json");
-const adapter = new lowdb.JSONFile<Data>(file);
-const db = new lowdb.Low(adapter);
-
-await db.read();
-
-db.data = db.data || { days: [] };
-db.write();
-
-const days = db.data.days;
-//************************************
-var config: any;
-//validate the arguments:
-//TODO rework, starts to become too complex, should check gurads, checks executed in order
-function validateArguments() {
-  if (process.argv[2] === "watch") {
-    if (
-      process.argv.length === 4 &&
-      fs.existsSync(process.argv[3]) &&
-      process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
-        "json"
-    ) {
-      let configArgumentValue = JSON.parse(
-        fs.readFileSync(process.argv[3]).toString()
-      );
-      if (validateConfigJSON(configArgumentValue)) {
-        config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-      } else {
-        console.log("The given config files format or content, was not valid!");
-        process.exit(1);
-      }
-    } else {
-      console.log(
-        `To watch a file provide a valid JSON file with configuration data.\n
-        1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-        `
-      );
-      process.exit(1);
-    }
-  } else if (process.argv[2] === "sync") {
-    if (
-      process.argv.length === 5 &&
-      fs.existsSync(process.argv[3]) &&
-      process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
-        "json" &&
-      Date.parse(process.argv[4])
-    ) {
-      let configArgumentValue = JSON.parse(
-        fs.readFileSync(process.argv[3]).toString()
-      );
-      if (validateConfigJSON(configArgumentValue)) {
-        config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-      } else {
-        console.log("The given config files format or content, was not valid!");
-        process.exit(1);
-      }
-    } else {
-      console.log(
-        `To sync a file provide a valid JSON file with configuration data and a valid date to sync.\n
-        2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-        `
-      );
-      process.exit(1);
-    }
-  } else {
-    console.log(`This program has 2 operation modes:\n
-    1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-    2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-    Please provide the valid arguments for one of them.\n
-    For more info see the readme file.\n`);
-    process.exit(1);
-  }
-}
-
-//TODO
-function validateConfigJSON(configObject: any): Boolean {
-  return true;
-}
+const days = db!.data!.days;
+var config: AquaLoggerConfig;
+var logger: winston.Logger;
 
 //main
 /**
  * Main entry point for the program.
  *
+ * Checks arguments, inits logger and config.
+ * 
  * Detects which mode is active:
  *
  * 1:Sync a standalone file, filepath given as argument.
@@ -131,6 +38,11 @@ function validateConfigJSON(configObject: any): Boolean {
  * 2:Start watching the current days logfile, in the log directory given as argument.
  */
 async function main() {
+  //validate the arguments
+  validateArguments(process.argv);
+  config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+  //Winston Logger setup
+  logger = initWinston(config!);
   logger.info("Program started. Mode: " + process.argv[2]);
 
   if (process.argv[2] === "watch") {
@@ -173,7 +85,6 @@ async function establishConnection() {
   watchLogFile(new Date());
   //sync the files of missing days, expect todays file
   syncPastDays();
-
   //syncing must happen after the watch started, to not let any records slip
 }
 
@@ -448,43 +359,9 @@ function postData(producedFrames: FrameRecord[]) {
       frames: producedFrames,
     });
   }
+  logger.http("Data sent: " + JSON.stringify(producedFrames));
   db.write();
 }
 
 //execute program
-validateArguments();
-//Winston Logger setup
-const fileTransport: DailyRotateFile = new DailyRotateFile({
-  filename: "%DATE%.log",
-  dirname: config.logFolderPath,
-  datePattern: "YYYY-MM-DD",
-  zippedArchive: true,
-  maxSize: "20m",
-  maxFiles: "14d",
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.align(),
-    winston.format.printf(
-      (info) => `${info.timestamp} ${info.level}: ${info.message}`
-    )
-  ),
-  handleExceptions: true,
-});
-
-const consoleTransport = new winston.transports.Console({
-  format: winston.format.combine(
-    winston.format.colorize(),
-    winston.format.timestamp(),
-    winston.format.align(),
-    winston.format.printf(
-      (info) => `${info.timestamp} ${info.level}: ${info.message}`
-    )
-  ),
-  handleExceptions: true,
-});
-
-const logger = winston.createLogger({
-  transports: [consoleTransport, fileTransport],
-});
-
 main();

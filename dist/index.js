@@ -1,81 +1,10 @@
 #!/usr/bin/env node
+//imports
 import fs from "fs";
-import winston from "winston";
-import DailyRotateFile from "winston-daily-rotate-file";
-//*********************
-//LOWDB setup
-import { join, dirname } from "path";
-import * as lowdb from "lowdb";
-import { fileURLToPath } from "url";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const file = join(__dirname, "db.json");
-const adapter = new lowdb.JSONFile(file);
-const db = new lowdb.Low(adapter);
-await db.read();
-db.data = db.data || { days: [] };
-db.write();
+import { validateArguments } from "./validations.js";
+import { initWinston } from "./logger.js";
+import { db } from "./lowdb-config.js";
 const days = db.data.days;
-//************************************
-var config;
-//validate the arguments:
-//TODO rework, starts to become too complex, should check gurads, checks executed in order
-function validateArguments() {
-    if (process.argv[2] === "watch") {
-        if (process.argv.length === 4 &&
-            fs.existsSync(process.argv[3]) &&
-            process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
-                "json") {
-            let configArgumentValue = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-            if (validateConfigJSON(configArgumentValue)) {
-                config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-            }
-            else {
-                console.log("The given config files format or content, was not valid!");
-                process.exit(1);
-            }
-        }
-        else {
-            console.log(`To watch a file provide a valid JSON file with configuration data.\n
-        1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-        `);
-            process.exit(1);
-        }
-    }
-    else if (process.argv[2] === "sync") {
-        if (process.argv.length === 5 &&
-            fs.existsSync(process.argv[3]) &&
-            process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
-                "json" &&
-            Date.parse(process.argv[4])) {
-            let configArgumentValue = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-            if (validateConfigJSON(configArgumentValue)) {
-                config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-            }
-            else {
-                console.log("The given config files format or content, was not valid!");
-                process.exit(1);
-            }
-        }
-        else {
-            console.log(`To sync a file provide a valid JSON file with configuration data and a valid date to sync.\n
-        2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-        `);
-            process.exit(1);
-        }
-    }
-    else {
-        console.log(`This program has 2 operation modes:\n
-    1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-    2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-    Please provide the valid arguments for one of them.\n
-    For more info see the readme file.\n`);
-        process.exit(1);
-    }
-}
-//TODO
-function validateConfigJSON(configObject) {
-    return true;
-}
 //main
 /**
  * Main entry point for the program.
@@ -363,27 +292,14 @@ function postData(producedFrames) {
             frames: producedFrames,
         });
     }
+    logger.http("Data sent: " + JSON.stringify(producedFrames));
     db.write();
 }
 //execute program
-validateArguments();
+//validate the arguments
+validateArguments(process.argv);
+const config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
 //Winston Logger setup
-const fileTransport = new DailyRotateFile({
-    filename: "%DATE%.log",
-    dirname: config.logFolderPath,
-    datePattern: "YYYY-MM-DD",
-    zippedArchive: true,
-    maxSize: "20m",
-    maxFiles: "14d",
-    format: winston.format.combine(winston.format.timestamp(), winston.format.align(), winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)),
-    handleExceptions: true,
-});
-const consoleTransport = new winston.transports.Console({
-    format: winston.format.combine(winston.format.colorize(), winston.format.timestamp(), winston.format.align(), winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)),
-    handleExceptions: true,
-});
-const logger = winston.createLogger({
-    transports: [consoleTransport, fileTransport],
-});
+const logger = initWinston(config);
 main();
 //# sourceMappingURL=index.js.map
