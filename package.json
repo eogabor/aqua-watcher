@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "start": "tsc && node ./dist/index.js watch C:/Users/Gabor/Desktop/frame-logger/config.json",
+    "start": "tsc && node ./dist/index.js watch config.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,7 +13,9 @@
   "dependencies": {
     "@types/is-valid-path": "^0.1.0",
     "is-valid-path": "^0.1.1",
-    "lowdb": "^3.0.0"
+    "lowdb": "^3.0.0",
+    "winston": "^3.7.2",
+    "winston-daily-rotate-file": "^4.6.1"
   },
   "type": "module",
   "engines": {

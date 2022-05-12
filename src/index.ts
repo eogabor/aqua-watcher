@@ -3,6 +3,17 @@
 //imports
 import isValidPath from "is-valid-path";
 import fs from "fs";
+import winston from "winston";
+import DailyRotateFile from "winston-daily-rotate-file";
+
+//type of the config file data
+type AquaLoggerConfig = {
+  targetFolderPath: string;
+  timeout: number;
+  logFolderPath: string;
+  endOfLineChar: string;
+  machineId: number;
+};
 
 //*********************
 //LOWDB setup
@@ -42,48 +53,71 @@ db.write();
 const days = db.data.days;
 //************************************
 var config: any;
-//arguments guard
-if (process.argv[2] === "watch") {
-  if (
-    process.argv.length === 4 &&
-    fs.existsSync(process.argv[3]) &&
-    process.argv[3].split(".")[process.argv[3].split(".").length - 1] === "json"
-  ) {
-    //TODO check if all required attributes are present
-    config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+//validate the arguments:
+//TODO rework, starts to become too complex, should check gurads, checks executed in order
+function validateArguments() {
+  if (process.argv[2] === "watch") {
+    if (
+      process.argv.length === 4 &&
+      fs.existsSync(process.argv[3]) &&
+      process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
+        "json"
+    ) {
+      let configArgumentValue = JSON.parse(
+        fs.readFileSync(process.argv[3]).toString()
+      );
+      if (validateConfigJSON(configArgumentValue)) {
+        config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+      } else {
+        console.log("The given config files format or content, was not valid!");
+        process.exit(1);
+      }
+    } else {
+      console.log(
+        `To watch a file provide a valid JSON file with configuration data.\n
+        1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
+        `
+      );
+      process.exit(1);
+    }
+  } else if (process.argv[2] === "sync") {
+    if (
+      process.argv.length === 5 &&
+      fs.existsSync(process.argv[3]) &&
+      process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
+        "json" &&
+      Date.parse(process.argv[4])
+    ) {
+      let configArgumentValue = JSON.parse(
+        fs.readFileSync(process.argv[3]).toString()
+      );
+      if (validateConfigJSON(configArgumentValue)) {
+        config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
+      } else {
+        console.log("The given config files format or content, was not valid!");
+        process.exit(1);
+      }
+    } else {
+      console.log(
+        `To sync a file provide a valid JSON file with configuration data and a valid date to sync.\n
+        2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
+        `
+      );
+      process.exit(1);
+    }
   } else {
-    console.log(
-      `To watch a file provide a valid JSON file with configuration data.\n
-      1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-      `
-    );
+    console.log(`This program has 2 operation modes:\n
+    1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
+    2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
+    Please provide the valid arguments for one of them.\n
+    For more info see the readme file.\n`);
     process.exit(1);
   }
-} else if (process.argv[2] === "sync") {
-  if (
-    process.argv.length === 5 &&
-    fs.existsSync(process.argv[3]) &&
-    process.argv[3].split(".")[process.argv[3].split(".").length - 1] ===
-      "json" &&
-    Date.parse(process.argv[4])
-  ) {
-    //TODO check if all required attributes are present
-    config = JSON.parse(fs.readFileSync(process.argv[3]).toString());
-  } else {
-    console.log(
-      `To sync a file provide a valid JSON file with configuration data and a valid date to sync.\n
-      2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-      `
-    );
-    process.exit(1);
-  }
-} else {
-  console.log(`This program has 2 operation modes:\n
-  1. WATCH|args: watch <config_file_absolute_path> - Watches the log file of todayday, and sends data tot the server.\n
-  2. SYNC|args: sync <config_file_absolute_path> <syncable_date_as_string> - Syncs the log file of the day given as parameter. \n
-  Please provide the valid arguments for one of them.\n
-  For more info see the readme file.\n`);
-  process.exit(1);
+}
+
+//TODO
+function validateConfigJSON(configObject: any): Boolean {
+  return true;
 }
 
 //main
@@ -97,19 +131,14 @@ if (process.argv[2] === "watch") {
  * 2:Start watching the current days logfile, in the log directory given as argument.
  */
 async function main() {
-  createLogRecord("Program started. Mode: " + process.argv[2]);
+  logger.info("Program started. Mode: " + process.argv[2]);
 
-  try {
-    if (process.argv[2] === "watch") {
-      establishConnection();
-    }
+  if (process.argv[2] === "watch") {
+    establishConnection();
+  }
 
-    if (process.argv[2] === "sync") {
-      syncFile(getFilePath(getDayString(new Date(process.argv[4]))));
-    }
-  } catch (error: any) {
-    createErrorLogRecord(error.message);
-    process.exit(1);
+  if (process.argv[2] === "sync") {
+    syncFile(getFilePath(getDayString(new Date(process.argv[4]))));
   }
 }
 
@@ -122,16 +151,16 @@ async function main() {
 async function establishConnection() {
   let folderExists = false;
   while (!folderExists) {
-    createLogRecord(
+    logger.info(
       "Trying to reach destination folder: " + config.targetFolderPath
     );
     if (fs.existsSync(config.targetFolderPath)) {
       //if folder found exit the loop
       folderExists = true;
-      createLogRecord("Target folder found!");
+      logger.info("Target folder found!");
     } else {
       //if folder not found try again in config.timeout seconds
-      createLogRecord(
+      logger.warn(
         "Target folder not found, trying again in " +
           config.timeout +
           " seconds..."
@@ -152,7 +181,7 @@ async function establishConnection() {
  * Gets the last logged day from the server. If its prior to today, sync it and the days between toddys date.(Don't sync todays file)
  */
 async function syncPastDays() {
-  createLogRecord("Scan start for syncable past days...");
+  logger.info("Scan start for syncable past days...");
 
   //get the last logged time and set it to exact midnight
   let lastLoggedTime = getLastLogTime().setHours(12, 0, 0, 0);
@@ -173,7 +202,7 @@ async function syncPastDays() {
     currentTime += 1000 * 3600 * 24;
   }
 
-  createLogRecord(
+  logger.info(
     "The following past days need to be synced: " +
       (daysThatNeedSync.length > 0 ? daysThatNeedSync.join(", ") : "none")
   );
@@ -189,10 +218,10 @@ async function syncPastDays() {
  * @param filePath - Path to the file that needs to be synced.
  */
 function syncFile(filePath: string) {
-  createLogRecord("Tryig to syncing file: " + filePath);
+  logger.info("Tryig to syncing file: " + filePath);
   //file exists guard
   if (!fs.existsSync(filePath)) {
-    createLogRecord("File doesn't exist: " + filePath);
+    logger.warn("File doesn't exist: " + filePath);
     return;
   }
 
@@ -208,7 +237,7 @@ function syncFile(filePath: string) {
 
   //post the content of the file
   postData(records);
-  createLogRecord("File: " + filePath + " synced, data posted.");
+  logger.info("File: " + filePath + " synced, data posted.");
 }
 
 /**
@@ -227,12 +256,12 @@ function watchLogFile(date: Date) {
   //get the log file path to the day string
   let logFilePath = getFilePath(dayString);
 
-  createLogRecord("Try to watch log file of day: " + dayString);
+  logger.info("Try to watch log file of day: " + dayString);
 
   //check if the file exists
   //if file not found return to the main entry point
   if (!fs.existsSync(logFilePath)) {
-    createLogRecord(
+    logger.warn(
       "Log file of " +
         dayString +
         " doesn't exists yet, checking again in " +
@@ -249,7 +278,7 @@ function watchLogFile(date: Date) {
   let d = new Date().setUTCHours(24, 1, 0, 0);
   let msTillNewDay = d - new Date().getTime();
   setTimeout(() => {
-    createLogRecord("Stopped watching " + logFilePath);
+    logger.info("Stopped watching " + logFilePath);
     fs.unwatchFile(logFilePath);
     establishConnection();
   }, msTillNewDay);
@@ -285,7 +314,7 @@ function watchLogFile(date: Date) {
     // Parse the line(s) in the buffer.
     parseBuffer(buffer);
   });
-  createLogRecord("Started watching file: " + logFilePath);
+  logger.info("Started watching file: " + logFilePath);
   //sync the file after the watch was set
   syncFile(logFilePath);
 }
@@ -422,22 +451,40 @@ function postData(producedFrames: FrameRecord[]) {
   db.write();
 }
 
-/**
- * Inserts a message to the log file, with path specified in config file.
- * @param message - Message to be logged
- */
-function createLogRecord(message: string) {
-  let logLine = new Date().toLocaleString() + " : " + message + "\n";
-  fs.appendFileSync(config.logFolderPath + "/log.txt", logLine);
-}
-
-/**
- * Inserts a message to the error log file, with path specified in config file.
- * @param message - Message to be logged
- */
-function createErrorLogRecord(message: string) {
-  let logLine = new Date().toLocaleString() + " : " + message + "\n";
-  fs.appendFileSync(config.logFolderPath + "/error_log.txt", logLine);
-}
 //execute program
+validateArguments();
+//Winston Logger setup
+const fileTransport: DailyRotateFile = new DailyRotateFile({
+  filename: "%DATE%.log",
+  dirname: config.logFolderPath,
+  datePattern: "YYYY-MM-DD",
+  zippedArchive: true,
+  maxSize: "20m",
+  maxFiles: "14d",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.align(),
+    winston.format.printf(
+      (info) => `${info.timestamp} ${info.level}: ${info.message}`
+    )
+  ),
+  handleExceptions: true,
+});
+
+const consoleTransport = new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp(),
+    winston.format.align(),
+    winston.format.printf(
+      (info) => `${info.timestamp} ${info.level}: ${info.message}`
+    )
+  ),
+  handleExceptions: true,
+});
+
+const logger = winston.createLogger({
+  transports: [consoleTransport, fileTransport],
+});
+
 main();
