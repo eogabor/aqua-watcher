@@ -1,6 +1,6 @@
 {
   "name": "aqua-logger",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/is-valid-path": "^0.1.0",
+    "axios": "^0.27.2",
     "is-valid-path": "^0.1.1",
     "lowdb": "^3.0.0",
     "winston": "^3.7.2",

@@ -1,15 +1,6 @@
 import fs from "fs";
 import isValidPath from "is-valid-path";
 
-//type of the config file data
-export type AquaLoggerConfig = {
-  targetFolderPath: string;
-  timeout: number;
-  logFolderPath: string;
-  endOfLineChar: string;
-  machineId: number;
-};
-
 //validate the arguments:
 //TODO rework, starts to become too complex, should check gurads, checks executed in order
 let config = {};

@@ -1,9 +1,11 @@
-import winston, { http, verbose } from "winston";
+import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { AquaLoggerConfig } from "./validations";
+import { AquaLoggerConfig } from "./config.model";
 
 export function initWinston(config: AquaLoggerConfig) {
+  //create normal logger
   const fileTransport: DailyRotateFile = new DailyRotateFile({
+    level: "http",
     filename: "%DATE%.log",
     dirname: config.logFolderPath,
     datePattern: "YYYY-MM-DD",
@@ -21,6 +23,7 @@ export function initWinston(config: AquaLoggerConfig) {
   });
 
   const consoleTransport = new winston.transports.Console({
+    level: "http",
     format: winston.format.combine(
       winston.format.colorize(),
       winston.format.timestamp(),
@@ -30,10 +33,10 @@ export function initWinston(config: AquaLoggerConfig) {
       )
     ),
     handleExceptions: true,
-    level: "http",
   });
 
   const logger = winston.createLogger({
+    level: "http",
     transports: [consoleTransport, fileTransport],
   });
 
