@@ -1,0 +1,29 @@
+{
+    "name": "@types/valid-url",
+    "version": "1.0.3",
+    "description": "TypeScript definitions for valid-url",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "Steve Hipwell",
+            "url": "https://github.com/stevehipwell",
+            "githubUsername": "stevehipwell"
+        },
+        {
+            "name": "Gabriel Cangussu",
+            "url": "https://github.com/gcangussu",
+            "githubUsername": "gcangussu"
+        }
+    ],
+    "main": "",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/valid-url"
+    },
+    "scripts": {},
+    "dependencies": {},
+    "typesPublisherContentHash": "5d10a798113b29380170b6de8a7d9edbf86ee83a45b364c8f0a58de6b0067b8d",
+    "typeScriptVersion": "2.8"
+}

@@ -1,6 +1,6 @@
 {
-  "name": "aqua-logger",
-  "version": "1.0.3",
+  "name": "aqua-watcher",
+  "version": "1.0.1",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -12,9 +12,11 @@
   "license": "ISC",
   "dependencies": {
     "@types/is-valid-path": "^0.1.0",
+    "@types/valid-url": "^1.0.3",
     "axios": "^0.27.2",
     "is-valid-path": "^0.1.1",
     "lowdb": "^3.0.0",
+    "valid-url": "^1.0.9",
     "winston": "^3.7.2",
     "winston-daily-rotate-file": "^4.6.1"
   },
@@ -27,6 +29,6 @@
     "typescript": "^4.6.4"
   },
   "bin": {
-    "aqua-logger": "./dist/index.js"
+    "aqua-watcher": "./dist/index.js"
   }
 }
