@@ -1,0 +1,18 @@
+{
+    "sourceFolderPath": "//192.168.0.118/C/Data/Log",
+    "mountFolderPath": "//192.168.0.118/C/Data/Log",
+    "timeout": 600,
+    "logFolderPath": "./log",
+    "endOfLineChar": "\r\n",
+    "machineId": 8,
+    "getLastLogDateURL": "http://192.168.0.251/Spacers/api/af/getLastLoggedDate?machineId=8",
+    "postDataUrl": "http://192.168.0.251/Spacers/api/af/logRecords",
+    "offlineWindowStart": {
+        "H": 0,
+        "M": 1
+    },
+    "offlineWindowEnd": {
+        "H": 3,
+        "M": 0
+    }
+}

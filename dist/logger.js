@@ -15,7 +15,7 @@ export function initWinston(config) {
     });
     const consoleTransport = new winston.transports.Console({
         level: "http",
-        format: winston.format.combine(winston.format.colorize(), winston.format.timestamp(), winston.format.align(), winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)),
+        format: winston.format.combine(winston.format.colorize(), winston.format.timestamp({ format: timezoned }), winston.format.align(), winston.format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)),
         handleExceptions: true,
     });
     const logger = winston.createLogger({
@@ -24,4 +24,9 @@ export function initWinston(config) {
     });
     return logger;
 }
+const timezoned = () => {
+    return new Date().toLocaleString("HU", {
+        timeZone: "Europe/Budapest",
+    });
+};
 //# sourceMappingURL=logger.js.map

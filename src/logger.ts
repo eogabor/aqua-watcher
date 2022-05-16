@@ -26,7 +26,7 @@ export function initWinston(config: AquaLoggerConfig) {
     level: "http",
     format: winston.format.combine(
       winston.format.colorize(),
-      winston.format.timestamp(),
+      winston.format.timestamp({ format: timezoned }),
       winston.format.align(),
       winston.format.printf(
         (info) => `${info.timestamp} ${info.level}: ${info.message}`
@@ -42,3 +42,9 @@ export function initWinston(config: AquaLoggerConfig) {
 
   return logger;
 }
+
+const timezoned = () => {
+  return new Date().toLocaleString("HU", {
+    timeZone: "Europe/Budapest",
+  });
+};

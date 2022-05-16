@@ -66,9 +66,12 @@ async function main() {
 async function establishConnection() {
   await mountDrive();
   //start to watch todays log file, and after the watch started sync it
-  watchLogFile(new Date());
+  let watchSuccess = await watchLogFile(new Date());
   //sync the files of missing days, expect todays file
-  syncPastDays();
+  if (watchSuccess) {
+    syncPastDays();
+  }
+
   //syncing must happen after the watch started, to not let any records slip
 }
 
@@ -298,7 +301,7 @@ async function syncFile(filePath: string) {
  *
  * @param date - date of the log file to be watched, only the day will be extarcted
  */
-function watchLogFile(date: Date) {
+async function watchLogFile(date: Date): Promise<Boolean> {
   //get the day string of the given date parameter: format: YYYY-MM-dd
   let dayString = getDayString(date);
   //get the log file path to the day string
@@ -315,7 +318,7 @@ function watchLogFile(date: Date) {
     setTimeout(() => {
       establishConnection();
     }, getWakeUpTime().getTime() - new Date().getTime());
-    return;
+    return false;
   }
 
   //setTImeout to stop file watch at midnight and go back to main entry point
@@ -361,6 +364,7 @@ function watchLogFile(date: Date) {
   logger.info("Started watching file: " + logFilePath);
   //sync the file after the watch was set
   syncFile(logFilePath);
+  return true;
 }
 
 /**
@@ -522,6 +526,8 @@ async function postData(producedFrames: FrameRecord[]) {
     .catch((error) => {
       logger.error(JSON.stringify(error));
     });
+
+ 
 }
 
 //execute program
