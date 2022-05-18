@@ -518,16 +518,33 @@ async function postData(producedFrames: FrameRecord[]) {
     .post(config.postDataUrl, producedFrames)
     .then((res) => {
       logger.http(
-        `[POST]:${config.getLastLogDateURL} [STATUS]:${res.status}\n
+        `[POST]:${config.postDataUrl} [STATUS]:${res.status}\n
           BODY: ${JSON.stringify(producedFrames)}
           RESPONSE:${JSON.stringify(res.data)}`
       );
     })
     .catch((error) => {
-      logger.error(JSON.stringify(error));
+      logger.error("1: " + JSON.stringify(error));
     });
 
- 
+  await axios
+    .post("http://192.168.0.239:9000/event", {
+      type: "FrameProduced",
+      body: {},
+    })
+    .then((res) => {
+      logger.http(
+        `[POST]: http://192.168.0.239:9000/event [STATUS]:${res.status}\n
+        BODY:{
+          type: "FrameProduced",
+          body: {},
+        }
+        RESPONSE:${JSON.stringify(res.data)}`
+      );
+    })
+    .catch((error) => {
+      logger.error("2: " + JSON.stringify(error));
+    });
 }
 
 //execute program
